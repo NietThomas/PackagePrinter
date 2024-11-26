@@ -1,1 +1,1 @@
-Savaco One internal use. Refer to technote
+Savaco One, Refer to technote
