@@ -12,26 +12,30 @@ Also with configuration
 #### Win32 app Commands ####
 
 Install:
-powershell.exe -executionpolicy bypass -file .\Install-Printer.ps1 -PortName "IP_10.10.1.1" -PrinterIP "10.1.1.1" -PrinterName "Canon Printer Upstairs" -DriverName "Canon Generic Plus UFR II" -INFFile "CNLB0MA64.inf"
+RAW Printer: %WINDIR%\sysnative\WindowsPowerShell\v1.0\powershell.exe -executionpolicy bypass -file Install.ps1 -Porttype "RAW" -PortName "IP_10.10.1.1" -PrinterIP "10.1.1.1" -PrinterName "Canon Printer Upstairs" -DriverName "Canon Generic Plus UFR II" -INFFile "CNLB0MA64.inf" -Version 1.0.0
+LPR Printer: %WINDIR%\sysnative\WindowsPowerShell\v1.0\powershell.exe -executionpolicy bypass -file Install.ps1 -Porttype "LPR" -LprQueueName "LPR" -PortName "IP_10.10.1.1" -PrinterIP "10.1.1.1" -PrinterName "Canon Printer Upstairs" -DriverName "Canon Generic Plus UFR II" -INFFile "CNLB0MA64.inf" -Version 1.0.0
 
 Uninstall:
-powershell.exe -executionpolicy bypass -file .\Remove-Printer.ps1 -PrinterName "Canon Printer Upstairs"
+%WINDIR%\sysnative\WindowsPowerShell\v1.0\powershell.exe -executionpolicy bypass -file Uninstall.ps1 -PrinterName "Canon-Garage-Lade1-A4"
 
 Detection:
 HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\Print\Printers\Canon Printer Upstairs
 Name = "Canon Printer Upstairs"
 
-HKEY_LOCAL_MACHINE\SOFTWARE\IntunePrinters\ Canon Printer Upstairs
+HKEY_LOCAL_MACHINE\SOFTWARE\IntunePrinters\Canon Printer Upstairs
 Version = 1.0.0
 
 .Example
-.\Install-Printer.ps1 -PortName "IP_10.10.1.1" -PrinterIP "10.1.1.1" -PrinterName "Canon Printer Upstairs" -DriverName "Canon Generic Plus UFR II" -INFFile "CNLB0MA64.inf" -Version 1.0.0
+RAW Printer: %WINDIR%\sysnative\WindowsPowerShell\v1.0\powershell.exe -executionpolicy bypass -file Install.ps1 -Porttype "RAW" -PortName "IP_10.10.1.1" -PrinterIP "10.1.1.1" -PrinterName "Canon Printer Upstairs" -DriverName "Canon Generic Plus UFR II" -INFFile "CNLB0MA64.inf" -Version 1.0.0
+LPR Printer: %WINDIR%\sysnative\WindowsPowerShell\v1.0\powershell.exe -executionpolicy bypass -file Install.ps1 -Porttype "LPR" -LprQueueName "LPR" -PortName "IP_10.10.1.1" -PrinterIP "10.1.1.1" -PrinterName "Canon Printer Upstairs" -DriverName "Canon Generic Plus UFR II" -INFFile "CNLB0MA64.inf" -Version 1.0.0
 #>
 
 [CmdletBinding()]
 Param (
     [Parameter(Mandatory = $True)]
     [String]$PortName,
+    [Parameter(Mandatory = $True)]
+    [String]$Porttype,
     [Parameter(Mandatory = $True)]
     [String]$PrinterIP,
     [Parameter(Mandatory = $True)]
@@ -41,7 +45,9 @@ Param (
     [Parameter(Mandatory = $True)]
     [String]$INFFile,
     [Parameter(Mandatory = $True)]
-    [String]$Version
+    [String]$Version,
+    [Parameter(Mandatory = $False)]
+    [String]$LprQueueName
 )
 
 $registryPath = "HKLM:\SOFTWARE\IntunePrinters\" + $printerName
@@ -153,15 +159,23 @@ If (-not $ThrowBad) {
 
 If (-not $ThrowBad) {
     Try {
-
         #Create Printer Port
         $PortExist = Get-Printerport -Name $PortName -ErrorAction SilentlyContinue
+        if ($PortExist) {
+            if ($PortExist.Protocol -ne $PortType) {
+                Write-LogEntry -Stamp -Value "Removing Port ""$($PortName)"" because protocol does not match"
+                Remove-PrinterPort -Name $PortName -Confirm:$false
+                $PortExist = $null
+            }
+        }
         if (-not $PortExist) {
             Write-LogEntry -Stamp -Value "Adding Port ""$($PortName)"""
-            Add-PrinterPort -name $PortName -PrinterHostAddress $PrinterIP -Confirm:$false
-        }
-        else {
-            Write-LogEntry -Stamp -Value "Port ""$($PortName)"" already exists. Skipping Printer Port installation."
+            if ($PortType -eq "RAW") {
+                Add-PrinterPort -Name $PortName -PrinterHostAddress $PrinterIP -Confirm:$false
+            }
+            elseif ($PortType -eq "LPR") {
+                Add-PrinterPort -Name $PortName -LprHostAddress $PrinterIP -Confirm:$false -LprByteCounting -LprQueueName $LprQueueName
+            }
         }
     }
     Catch {
