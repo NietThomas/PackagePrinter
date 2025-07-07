@@ -108,6 +108,7 @@ foreach ($printer in $selectedPrinters) {
 
         try {
             Start-Process -FilePath $IntuneToolPath -ArgumentList "-c `"$printerDir`" -s Install.ps1 -o `"$outputDir`"" -Wait
+            Write-Host " ===================================================================================================================================="
             Write-Host "✅ Printer '$printer' succesvol verpakt in $outputDir"
 
             # Samenvatting
@@ -150,7 +151,7 @@ foreach ($printer in $selectedPrinters) {
             Write-Host "   Name:       Version"
             Write-Host "   Operator:   Equals"
             Write-Host "   Value:      $Version"
-            Write-Host ""
+            Write-Host " ===================================================================================================================================="
 
         } catch {
             Write-Error "❌ Fout bij packagen van printer ${printer}: $_"
