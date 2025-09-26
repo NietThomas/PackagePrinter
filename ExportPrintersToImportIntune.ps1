@@ -1,35 +1,41 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-# Controleer of IntuneWinAppUtil.exe aanwezig is, anders downloaden
+# Controleer of IntuneWinAppUtil.exe aanwezig is, anders downloaden via vaste link
 $IntuneToolPath = "C:\tools\IntuneWinAppUtil.exe"
 if (-Not (Test-Path $IntuneToolPath)) {
-    Write-Host "🔍 IntuneWinAppUtil.exe niet gevonden. Downloaden van GitHub..."
+    Write-Host "🔍 IntuneWinAppUtil.exe niet gevonden. Downloaden via vaste link..."
 
     $toolsDir = "C:\tools"
     New-Item -ItemType Directory -Path $toolsDir -Force | Out-Null
 
     try {
-        $releaseInfo = Invoke-RestMethod -Uri "https://api.github.com/repos/microsoft/Microsoft-Win32-Content-Prep-Tool/releases/latest"
-        $zipAsset = $releaseInfo.assets | Where-Object { $_.name -like '*.zip' } | Select-Object -First 1
+        $zipUrl = "https://codeload.github.com/microsoft/Microsoft-Win32-Content-Prep-Tool/zip/refs/tags/v1.8.7"
+        $zipPath = "$env:TEMP\IntuneWinAppUtil.zip"
 
-        if ($zipAsset -ne $null) {
-            $zipPath = "$env:TEMP\IntuneWinAppUtil.zip"
-            Invoke-WebRequest -Uri $zipAsset.browser_download_url -OutFile $zipPath
-            Expand-Archive -Path $zipPath -DestinationPath $toolsDir -Force
-            Remove-Item $zipPath
-            Write-Host "✅ IntuneWinAppUtil.exe succesvol gedownload en uitgepakt naar $toolsDir"
+        Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -ErrorAction Stop
+        # Tijdelijke uitpakmap
+        $tempExtractPath = "$env:TEMP\IntuneWinAppUtilExtract"
+        Expand-Archive -Path $zipPath -DestinationPath $tempExtractPath -Force
+        Remove-Item $zipPath
+        # Verplaats IntuneWinAppUtil.exe naar C:\tools
+        $exeSource = Get-ChildItem -Path $tempExtractPath -Recurse -Filter "IntuneWinAppUtil.exe" | Select-Object -First 1
+        if ($exeSource) {
+            Copy-Item -Path $exeSource.FullName -Destination $IntuneToolPath -Force
+            Remove-Item $tempExtractPath -Recurse -Force
+            Write-Host "✅ IntuneWinAppUtil.exe succesvol gedownload en geplaatst in $toolsDir"
         } else {
-            Write-Error "❌ Geen ZIP-bestand gevonden in de laatste GitHub-release."
+            Write-Error "❌ IntuneWinAppUtil.exe niet gevonden in de uitgepakte ZIP."
             exit 1
         }
     } catch {
-        Write-Error "❌ Fout bij downloaden van IntuneWinAppUtil.exe: $_"
+        Write-Error "❌ Fout bij downloaden of uitpakken van IntuneWinAppUtil.exe: $_"
         exit 1
     }
 } else {
     Write-Host "✅ IntuneWinAppUtil.exe al aanwezig in $IntuneToolPath"
 }
+
 
 # GUI voor printerselectie
 $form = New-Object System.Windows.Forms.Form
@@ -162,3 +168,4 @@ foreach ($printer in $selectedPrinters) {
         Write-Error "❌ Onverwachte fout bij verwerken van printer ${printer}: $_"
     }
 }
+
